@@ -1,0 +1,22 @@
+# Java
+*.class
+*.jar
+*.war
+*.iml
+*.log
+target/
+build/
+
+# Spring Boot
+application.properties
+application.yml
+
+# IntelliJ
+.idea/
+*.iws
+*.ipr
+*.iml
+
+# Others
+.DS_Store
+*.env
