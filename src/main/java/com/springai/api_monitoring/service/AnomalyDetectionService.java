@@ -8,6 +8,7 @@ import com.springai.api_monitoring.repository.AnomaliesRepository;
 import com.springai.api_monitoring.repository.MetricsRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,17 +37,18 @@ public class AnomalyDetectionService {
         this.properties = properties;
     }
 
-    // Main detection logic, manual or scheduled
-    public int detectAnomalies() {
-        List<Metrics> metricsList = metricsRepository.findAll();
-        int newAnomaliesCount = 0;
-        for (Metrics metric : metricsList) {
-            // Refactored to a helper method for clarity
-            detectAndRecordAnomalyForMetric(metric).ifPresent(anomaly -> newAnomaliesCount++);
-        }
-        return newAnomaliesCount;
+    // Main detection logic, processes metrics within a given time window
+    public int detectAnomalies(LocalDateTime startTime, LocalDateTime endTime) {
+        List<Metrics> metricsList = metricsRepository.findByTimestampBetween(startTime, endTime);
+        // Use a stream to process metrics and count the successfully created anomalies.
+        // This avoids the "effectively final" lambda issue and is more idiomatic.
+        return (int) metricsList.stream()
+                .map(this::detectAndRecordAnomalyForMetric)
+                .filter(Optional::isPresent)
+                .count();
     }
 
+    @Transactional
     private Optional<Anomalies> detectAndRecordAnomalyForMetric(Metrics metric) {
         List<String> anomalyTypes = new ArrayList<>();
         Severity severity = null;
@@ -89,13 +91,17 @@ public class AnomalyDetectionService {
         return Optional.of(anomaly);
     }
 
-    // Automatically run detection every 5 minutes
-    @Scheduled(fixedRate = 300000)
+    // Automatically run detection every 5 minutes.
+    // Using fixedDelay to ensure there's a 5-minute pause *after* the last execution completes.
+    @Scheduled(fixedDelay = 300000)
     public void scheduledDetection() {
-        int count = detectAnomalies();
+        LocalDateTime endTime = LocalDateTime.now();
+        // Check metrics from the last 5 minutes to align with the schedule
+        LocalDateTime startTime = endTime.minusMinutes(5);
+        int count = detectAnomalies(startTime, endTime);
         if (count > 0) {
             // Use parameterized logging for better performance and readability
-            logger.info("{} new anomalies detected automatically at {}", count, LocalDateTime.now());
+            logger.info("{} new anomalies detected automatically in time window {} to {}", count, startTime, endTime);
         }
     }
 }

@@ -3,9 +3,13 @@ package com.springai.api_monitoring.controller;
 import com.springai.api_monitoring.model.Anomalies;
 import com.springai.api_monitoring.service.AnomaliesService;
 import com.springai.api_monitoring.service.AnomalyDetectionService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/anomalies")
@@ -47,8 +51,18 @@ public class AnomaliesController {
 
     // New endpoint to trigger anomaly detection
     @PostMapping("/detect")
-    public String detectAnomalies() {
-        int count = anomalyDetectionService.detectAnomalies();
-        return count + " anomalies detected and added.";
+    public ResponseEntity<Map<String, Object>> triggerManualDetection() {
+        // Define a time window for the manual scan, e.g., the last 10 minutes.
+        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime startTime = endTime.minusMinutes(10);
+        int count = anomalyDetectionService.detectAnomalies(startTime, endTime);
+
+        // Return a structured response instead of a simple string
+        Map<String, Object> responseBody = new LinkedHashMap<>();
+        responseBody.put("status", "SUCCESS");
+        responseBody.put("anomaliesFound", count);
+        responseBody.put("scanWindowStart", startTime.toString());
+        responseBody.put("scanWindowEnd", endTime.toString());
+        return ResponseEntity.ok(responseBody);
     }
 }
